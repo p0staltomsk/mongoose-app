@@ -10,8 +10,12 @@ export default defineConfig({
     },
   },
   server: {
+    port: 5173,
+    host: true,
     proxy: {
-      '/api': 'http://localhost:3000'
+      '/api': 'http://localhost:4567'
     }
-  }
+  },
+  root: process.cwd(),
+  publicDir: 'public'
 });
