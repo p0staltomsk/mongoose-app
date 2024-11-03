@@ -4,10 +4,17 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { XIcon, LoaderIcon } from "@/components/ui/icons"
+import { toast } from 'react-toastify';
 
 interface CustomElementCreatorProps {
   onSave: (elementName: string) => void;
   onNotify: (message: string, type: 'success' | 'error') => void;
+}
+
+interface ErrorResponse {
+  error: string;
+  code: string;
+  field?: string;
 }
 
 export default function CustomElementCreator({ onSave, onNotify }: CustomElementCreatorProps) {
@@ -21,6 +28,12 @@ export default function CustomElementCreator({ onSave, onNotify }: CustomElement
   const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
+  const [elementData, setElementData] = useState({
+    name: '',
+    symbol: '',
+    atomicNumber: 0,
+    atomicMass: 0,
+  });
 
   const API_BASE = import.meta.env.PROD ? '/mongoose-app/api' : '/api';
 
@@ -106,6 +119,44 @@ export default function CustomElementCreator({ onSave, onNotify }: CustomElement
     setCardCVC('');
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      const response = await fetch('/mongoose-app/api/elements', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(elementData),
+      });
+
+      const data = await response.json() as ErrorResponse;
+      console.log('Response:', data);
+
+      if (response.status === 400 && data.code === 'DUPLICATE_ELEMENT') {
+        toast.warning('Такой элемент уже существует в таблице!');
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error('Ошибка при добавлении элемента');
+      }
+
+      setElementData({
+        name: '',
+        symbol: '',
+        atomicNumber: 0,
+        atomicMass: 0,
+      });
+      toast.success('Элемент успешно добавлен!');
+      
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Произошла ошибка при добавлении элемента');
+    }
+  };
+
   return (
     <div className="form-container">
       {!isFormVisible ? (
@@ -134,7 +185,7 @@ export default function CustomElementCreator({ onSave, onNotify }: CustomElement
                 Создайте свой элемент!
               </CardTitle>
               <CardDescription className="text-sm">
-                Бесплатно на 7 дней или навсегда в своем сердце❤️‍🔥
+                Бесплатно на 7 дней или навсегда в своем сердце❤️‍
               </CardDescription>
             </CardHeader>
             <CardContent className="pb-3 relative z-10">

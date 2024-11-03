@@ -1,29 +1,24 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import path from 'path';
+import path from "path"
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
   base: '/mongoose-app/',
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
+    alias: [
+      { find: '@', replacement: path.resolve(__dirname, 'src') }
+    ]
   },
   server: {
     port: 5173,
     host: true,
     proxy: {
-      '/api': {
+      '/mongoose-app/api': {
         target: 'http://localhost:4567',
-        changeOrigin: true,
-        secure: false
+        changeOrigin: true
       }
     }
-  },
-  build: {
-    outDir: 'dist',
-    emptyOutDir: true
   }
-});
+})
 

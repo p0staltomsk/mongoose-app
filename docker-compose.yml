@@ -8,11 +8,10 @@ services:
       - "27019:27017"
     volumes:
       - mongodb_data:/data/db
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=admin
-      - MONGO_INITDB_ROOT_PASSWORD=password123
+    command: mongod --noauth
     networks:
       - periodic-network
+    hostname: mongodb
 
   mongo-express:
     image: mongo-express:latest
@@ -20,9 +19,7 @@ services:
     ports:
       - "8082:8081"
     environment:
-      - ME_CONFIG_MONGODB_ADMINUSERNAME=admin
-      - ME_CONFIG_MONGODB_ADMINPASSWORD=password123
-      - ME_CONFIG_MONGODB_SERVER=mongodb
+      - ME_CONFIG_MONGODB_URL=mongodb://mongodb:27017/
     depends_on:
       - mongodb
     networks:
@@ -33,35 +30,18 @@ services:
     container_name: periodic-api
     ports:
       - "4567:4567"
+    volumes:
+      - ./src:/app/src
     environment:
-      - MONGODB_URI=mongodb://admin:password123@mongodb:27017/periodic-table?authSource=admin
+      - MONGODB_URI=mongodb://mongodb:27017/periodic-table
       - FLASK_ENV=development
       - FLASK_DEBUG=1
-    command: python src/api/main.py
+      - PYTHONUNBUFFERED=1
     depends_on:
       - mongodb
     networks:
       - periodic-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4567/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  api-bun:
-    build:
-      context: .
-      dockerfile: Dockerfile.bun
-    container_name: periodic-api-bun
-    ports:
-      - "4568:4567"
-    environment:
-      - MONGODB_URI=mongodb://admin:password123@mongodb:27017/periodic-table?authSource=admin
-    depends_on:
-      - mongodb
-    networks:
-      - periodic-network
+    command: python src/api/main.py --host 0.0.0.0
 
 volumes:
   mongodb_data:

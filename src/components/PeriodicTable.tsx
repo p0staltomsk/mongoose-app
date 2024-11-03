@@ -20,6 +20,7 @@ const PeriodicTable: React.FC = () => {
     message: string;
     type: 'success' | 'error';
   } | null>(null);
+  const [elements, setElements] = useState<PeriodicElement[]>([]);
 
   const sceneRef = useRef<THREE.Scene>(new THREE.Scene());
   const cameraRef = useRef<THREE.PerspectiveCamera>(
@@ -103,6 +104,18 @@ const PeriodicTable: React.FC = () => {
       .start();
   };
 
+  const loadElements = async () => {
+    try {
+      const response = await fetch('/mongoose-app/api/elements');
+      if (!response.ok) throw new Error('Failed to fetch elements');
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error loading elements:', error);
+      return [];
+    }
+  };
+
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -117,44 +130,81 @@ const PeriodicTable: React.FC = () => {
     controlsRef.current.maxDistance = 8000;
     controlsRef.current.addEventListener('change', render);
 
-    const data = formatPeriodicData();
-    data.forEach((element, i) => {
-      const el = document.createElement('div');
-      el.className = 'element';
-      el.style.backgroundColor = `rgba(0,127,127,${Math.random() * 0.5 + 0.25})`;
+    const initializeTable = async () => {
+      const customElements = await loadElements();
+      const formattedCustomElements = customElements.map((element: PeriodicElement) => ({
+        ...element,
+        mass: element.atomicMass,
+        symbol: 'NEW',
+        name: element.name || 'Unknown'
+      }));
       
-      const number = document.createElement('div');
-      number.className = 'number';
-      number.textContent = String(i + 1);
-      el.appendChild(number);
+      const data = [...formatPeriodicData(), ...formattedCustomElements];
       
-      const symbol = document.createElement('div');
-      symbol.className = 'symbol';
-      symbol.textContent = element.symbol;
-      el.appendChild(symbol);
-      
-      const details = document.createElement('div');
-      details.className = 'details';
-      details.innerHTML = `${element.name}<br>${element.mass}`;
-      el.appendChild(details);
+      data.forEach((element, i) => {
+        const el = document.createElement('div');
+        el.className = 'element';
+        
+        const isCustomElement = i >= formatPeriodicData().length;
+        
+        if (isCustomElement) {
+          el.classList.add('custom-element');
+          el.style.backgroundColor = `rgba(255,69,0,${Math.random() * 0.5 + 0.5})`;
+        } else {
+          el.style.backgroundColor = `rgba(0,127,127,${Math.random() * 0.5 + 0.25})`;
+        }
+        
+        const number = document.createElement('div');
+        number.className = 'number';
+        number.textContent = String(element.atomicNumber || i + 1);
+        el.appendChild(number);
+        
+        const symbol = document.createElement('div');
+        symbol.className = 'symbol';
+        if (isCustomElement) {
+          symbol.innerHTML = `
+            <div class="custom-symbol">
+              <span class="icon">⚡</span>
+              <span class="text">NEW</span>
+            </div>
+          `;
+          symbol.style.fontSize = '24px';
+        } else {
+          symbol.textContent = element.symbol;
+        }
+        el.appendChild(symbol);
+        
+        const details = document.createElement('div');
+        details.className = 'details';
+        if (isCustomElement) {
+          details.classList.add('custom-details');
+          details.style.fontSize = '14px';
+        }
+        details.innerHTML = isCustomElement ? 
+          `${element.name}<br>&nbsp;` :
+          `${element.name}<br>${element.mass}`;
+        el.appendChild(details);
 
-      const object = new CSS3DObject(el);
-      object.position.x = Math.random() * 4000 - 2000;
-      object.position.y = Math.random() * 4000 - 2000;
-      object.position.z = Math.random() * 4000 - 2000;
-      sceneRef.current.add(object);
-      objectsRef.current.push(object);
+        const object = new CSS3DObject(el);
+        object.position.x = Math.random() * 4000 - 2000;
+        object.position.y = Math.random() * 4000 - 2000;
+        object.position.z = Math.random() * 4000 - 2000;
+        sceneRef.current.add(object);
+        objectsRef.current.push(object);
 
-      targetsRef.current.table.push(getTablePosition(i));
-      targetsRef.current.sphere.push(getSpherePosition(i, data.length));
-      targetsRef.current.helix.push(getHelixPosition(i));
-      targetsRef.current.grid.push(getGridPosition(i));
-      targetsRef.current.heart.push(getHeartPosition(i, data.length));
-    });
+        targetsRef.current.table.push(getTablePosition(i));
+        targetsRef.current.sphere.push(getSpherePosition(i, data.length));
+        targetsRef.current.helix.push(getHelixPosition(i));
+        targetsRef.current.grid.push(getGridPosition(i));
+        targetsRef.current.heart.push(getHeartPosition(i, data.length));
+      });
 
-    setLoading(false);
-    transform(targetsRef.current.table, 2000);
-    animateFireParticles();
+      setLoading(false);
+      transform(targetsRef.current.table, 2000);
+      animateFireParticles();
+    };
+
+    initializeTable();
 
     const handleResize = () => {
       if (cameraRef.current && rendererRef.current) {

@@ -120,18 +120,18 @@ export const periodicTableData = [
 ] as const;
 
 export interface PeriodicElement {
-  symbol: string;
   name: string;
-  mass: string;
-  xPos: number;
-  yPos: number;
+  symbol: string;
+  atomicNumber?: number;
+  atomicMass?: number;
+  mass?: number;
 }
 
 export function formatPeriodicData(): PeriodicElement[] {
   return periodicTableData.map(([symbol, name, mass, x, y]) => ({
     symbol: String(symbol),
     name: String(name),
-    mass: String(mass),
+    mass: Number(mass),
     xPos: Number(x),
     yPos: Number(y)
   }));
