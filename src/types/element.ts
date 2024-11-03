@@ -1,10 +1,11 @@
-export interface Element {
-  atomicNumber: number;
-  symbol: string;
+import { Document } from 'mongoose';
+
+export interface IElement extends Document {
   name: string;
-  atomicMass: number;
-  category: string;
-  color?: string;
-  description?: string;
-  customProperties?: Map<string, any>;
+  symbol: string;
+  mass: string;
+  number: number;
+  createdAt: Date;
+  expiresAt: Date | null;
+  isPermanent: boolean;
 } 

@@ -1,27 +1,22 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "ESNext",
-    "moduleResolution": "node",
-    "esModuleInterop": true,
+    "module": "CommonJS",
+    "outDir": "dist",
+    "rootDir": "src",
     "strict": true,
+    "esModuleInterop": true,
     "skipLibCheck": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "declaration": true,
-    "emitDeclarationOnly": false,
-    "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
     "types": ["node", "express", "cors"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+    "allowJs": true
   },
-  "include": [
-    "src/api/**/*",
-    "src/models/**/*",
-    "src/db/**/*"
-  ],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/api/**/*", "src/models/**/*", "src/types/**/*", "src/db/**/*"],
+  "exclude": ["node_modules"]
 } 

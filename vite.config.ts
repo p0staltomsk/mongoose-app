@@ -4,6 +4,7 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
+  base: '/mongoose-app/',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -13,9 +14,16 @@ export default defineConfig({
     port: 5173,
     host: true,
     proxy: {
-      '/api': 'http://localhost:4567'
+      '/api': {
+        target: 'http://localhost:4567',
+        changeOrigin: true,
+        secure: false
+      }
     }
   },
-  root: process.cwd(),
-  publicDir: 'public'
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true
+  }
 });
+

@@ -1,118 +1,135 @@
 # 3D Periodic Table Visualization 🌌
 
-<div align="center">
-  <img src="https://user-images.githubusercontent.com/709451/182802334-d9c42afe-f35d-4a7b-86ea-9985f73f20c3.png" width="100" alt="Bun" />
-  <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAATYAAACiCAMAAAD84hF6AAAAjVBMVEUAAAD..." width="100" alt="Three.js" />
-</div>
-
-An interactive 3D visualization of the periodic table using modern web technologies.
+Интерактивная 3D визуализация периодической таблицы с возможностью создания пользовательских элементов.
 
 ## 🚀 Tech Stack
 
 ### Frontend
-- **React 18** with TypeScript
-- **Three.js** for 3D visualization
-- **Vite** for blazing-fast development
-- **TailwindCSS** for styling
+- **React 18** с TypeScript
+- **Three.js** для 3D визуализации
+- **Vite** для разработки
+- **TailwindCSS** для стилей
+- **TWEEN.js** для анимаций
 
 ### Backend
-- **Bun** - next-gen JavaScript runtime
-- **Express** - web framework
-- **MongoDB** with Mongoose
-- **TypeScript** for type safety
+- **Python** с Flask
+- **Flask-CORS** для CORS
+- **PyMongo** для работы с MongoDB
+- **Logging** для отладки
 
-## ✨ Features
+### Database
+- **MongoDB** - основная БД
+- **Mongo Express** - админ панель
 
-- 🎮 Interactive 3D visualization
-- 🔄 Multiple view modes:
-  - Classic Table
-  - Sphere Formation
-  - Helix Structure
-  - Grid Layout
-  - ❤️‍🔥 Special Heart Animation
-- 🎯 Real-time transitions and animations
-- 🌈 Particle effects and visual enhancements
-- 📱 Responsive design
-- 🔍 Element details on hover
+### Infrastructure
+- **Docker** + docker-compose
+- **Nginx** для production
+- **Python 3.11** в Alpine контейнере
 
-## 🛠 Setup
-
-1. Install dependencies:
-```bash
-pnpm install
-```
-
-2. Start MongoDB:
-```bash
-sudo systemctl start mongodb
-```
-
-3. Initialize database:
-```bash
-pnpm run initdb
-```
-
-4. Start development servers:
-```bash
-# Terminal 1 - API Server
-pnpm run server
-
-# Terminal 2 - Frontend Dev Server
-pnpm run dev
-```
-
-## 🏗 Project Structure
+## 🏗 Архитектура
 
 ```
 project/
 ├── src/
-│   ├── components/          # React components
-│   │   ├── ui/             # UI components
-│   │   └── 3d/            # Three.js components
-│   ├── data/              # Static data
-│   ├── models/            # Mongoose models
-│   ├── api/               # Express routes
-│   ├── db/                # Database config
-│   ├── styles/            # CSS styles
-│   └── types/             # TypeScript types
-├── public/                # Static assets
-└── config/               # Config files
+│   ├── api/              # Flask API
+│   ├── components/       # React компоненты
+│   │   ├── ui/          # UI компоненты
+│   │   └── 3d/          # Three.js компоненты
+│   ├── data/            # Статичные данные
+│   ├── styles/          # CSS стили
+│   └── types/           # TypeScript типы
+├── docker/              # Docker конфигурация
+└── scripts/             # Скрипты для деплоя
 ```
 
-## 🔧 Development
+## 🔧 API Endpoints
 
-- `pnpm dev` - Start frontend development server
-- `pnpm server` - Start API server
-- `pnpm build` - Build for production
-- `pnpm test` - Run tests
-- `pnpm format` - Format code
+```
+POST /api/elements
+- Создание нового элемента
+- Payload: { name: string, expiresAt?: Date, isPermanent?: boolean }
 
-## 🌟 Special Features
+GET /api/elements
+- Получение всех элементов
 
-### Heart Animation Mode ❤️‍🔥
-- Dynamic particle effects
-- Pulsating animation
-- Random element distribution
-- Color transitions
+GET /health
+- Проверка работоспособности API
+```
 
-### Performance Optimizations
-- Efficient particle system
-- Optimized Three.js rendering
-- Smooth transitions
-- Memory management
+## 📦 MongoDB Schema
 
-## 📚 API Documentation
+```typescript
+Element {
+  name: string,          // Название элемента
+  symbol: string,        // Первые 2 буквы названия
+  mass: string,          // "???" по умолчанию
+  number: number,        // >118, автоинкремент
+  createdAt: Date,      // Дата создания
+  expiresAt: Date,      // TTL для временных элементов
+  isPermanent: boolean  // Флаг постоянного элемента
+}
+```
 
-### Endpoints
-- `GET /api/elements` - Get all elements
-- `POST /api/elements` - Add custom element
-- `PUT /api/elements/:id` - Update element
-- `DELETE /api/elements/:id` - Delete element
+## 🛠 Development Setup
 
-## 🤝 Contributing
+1. Установка зависимостей:
+```bash
+# Frontend
+pnpm install
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+# Backend
+pip install -r requirements.txt
+```
 
-## 📄 License
+2. Запуск инфраструктуры:
+```bash
+docker-compose up -d
+```
 
-MIT
+3. Запуск для разработки:
+```bash
+# Frontend - http://localhost:5173
+pnpm dev
+
+# Backend - http://localhost:4567
+python src/api/main.py
+
+# MongoDB Admin - http://localhost:8082
+```
+
+## 🚀 Production Deployment
+
+1. Сборка:
+```bash
+docker-compose -f docker-compose.prod.yml build
+```
+
+2. Запуск:
+```bash
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+## 🔍 Логирование
+
+- Flask логирует все операции с БД
+- Vite логирует прокси-запросы
+- MongoDB логи доступны через mongo-express
+
+## 🔒 Security
+
+- CORS настроен для разработки
+- MongoDB защищена авторизацией
+- Nginx настроен с security headers
+
+## 📈 Мониторинг
+
+- Health check endpoint
+- MongoDB метрики
+- Docker healthcheck
+
+## 🎯 Особенности реализации
+
+- Автоматическое удаление временных элементов через MongoDB TTL индекс
+- Генерация символов из названия элемента
+- Автоинкремент номеров элементов
+- Поддержка постоянных и временных элементов

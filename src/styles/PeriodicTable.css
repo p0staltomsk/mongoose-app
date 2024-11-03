@@ -154,4 +154,91 @@
   height: 100%;
   background-color: #000;
   overflow: hidden;
+}
+
+.controls button:nth-last-child(1) {
+  font-size: 1em;
+  padding: 5px 15px;
+  margin-left: 20px;
+  border: none;
+  outline: none;
+  color: white;
+  text-shadow: 0 0 5px rgba(0,255,255,0.5);
+  box-shadow: 0 0 10px rgba(0,255,255,0.3);
+  transition: all 0.3s ease;
+  animation: glow 2s ease-in-out infinite;
+}
+
+@keyframes glow {
+  0% {
+    box-shadow: 0 0 10px rgba(0,255,255,0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(0,255,255,0.5);
+  }
+  100% {
+    box-shadow: 0 0 10px rgba(0,255,255,0.3);
+  }
+}
+
+.notification {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translate(-50%, -100%);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+/* Добавим новые стили */
+.notification-container {
+  position: fixed;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999; /* Самый высокий z-index */
+}
+
+.form-container {
+  position: fixed;
+  right: 4px;
+  top: 4px;
+  z-index: 100; /* Ниже уведомлений */
+}
+
+/* Медиа-запросы для мобильных устройств */
+@media (max-width: 768px) {
+  .form-container {
+    right: 50%;
+    transform: translateX(50%);
+    width: 90%;
+    max-width: 300px;
+  }
+
+  .controls {
+    bottom: 10px;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 0 10px;
+  }
+
+  .controls button {
+    font-size: 14px;
+    padding: 8px 12px;
+  }
+
+  .element {
+    width: 100px;
+    height: 140px;
+  }
+
+  .element .symbol {
+    font-size: 40px;
+  }
 } 

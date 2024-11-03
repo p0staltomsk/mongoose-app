@@ -6,6 +6,8 @@ import TWEEN from '@tweenjs/tween.js';
 import { formatPeriodicData, type PeriodicElement } from '../data/periodicTable';
 import '../styles/PeriodicTable.css';
 import { Points, BufferGeometry, Float32BufferAttribute, PointsMaterial } from 'three';
+import CustomElementCreator from './CustomElementCreator';
+import { ElementCounter } from './ElementCounter';
 
 type ViewMode = 'table' | 'sphere' | 'helix' | 'grid' | 'heart';
 
@@ -13,6 +15,11 @@ const PeriodicTable: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [currentView, setCurrentView] = useState<ViewMode>('table');
   const [loading, setLoading] = useState(true);
+  const [isFormVisible, setIsFormVisible] = useState(false);
+  const [notification, setNotification] = useState<{
+    message: string;
+    type: 'success' | 'error';
+  } | null>(null);
 
   const sceneRef = useRef<THREE.Scene>(new THREE.Scene());
   const cameraRef = useRef<THREE.PerspectiveCamera>(
@@ -154,6 +161,16 @@ const PeriodicTable: React.FC = () => {
         cameraRef.current.aspect = window.innerWidth / window.innerHeight;
         cameraRef.current.updateProjectionMatrix();
         rendererRef.current.setSize(window.innerWidth, window.innerHeight);
+
+        // Адаптивное расстояние камеры
+        const isMobile = window.innerWidth <= 768;
+        if (currentView === 'table') {
+          cameraRef.current.position.z = isMobile ? 6000 : 4000;
+        } else if (currentView === 'heart') {
+          cameraRef.current.position.z = isMobile ? 2000 : 1500;
+        }
+        // ... остальные виды ...
+
         render();
       }
     };
@@ -335,8 +352,24 @@ const PeriodicTable: React.FC = () => {
     });
   };
 
+  const handleSaveCustomElement = (elementName: string) => {
+    // ... логика сохранения элемента ...
+  };
+
+  const handleNotify = (message: string, type: 'success' | 'error') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
   return (
     <div className="relative w-full h-screen">
+      <ElementCounter />
+      {notification && (
+        <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-2 rounded-md shadow-lg
+          ${notification.type === 'success' ? 'bg-green-500' : 'bg-red-500'} text-white`}>
+          {notification.message}
+        </div>
+      )}
       <div className="controls">
         <button onClick={() => handleViewChange('table')}>TABLE</button>
         <button onClick={() => handleViewChange('sphere')}>SPHERE</button>
@@ -349,6 +382,10 @@ const PeriodicTable: React.FC = () => {
           ❤️‍🔥
         </button>
       </div>
+      <CustomElementCreator 
+        onSave={handleSaveCustomElement} 
+        onNotify={handleNotify}
+      />
       <div ref={containerRef} className="w-full h-full" id="container">
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75">

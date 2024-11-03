@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: periodic-mongodb
+    ports:
+      - "27019:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password123
+    networks:
+      - periodic-network
+
+  mongo-express:
+    image: mongo-express:latest
+    container_name: periodic-mongo-express
+    ports:
+      - "8082:8081"
+    environment:
+      - ME_CONFIG_MONGODB_ADMINUSERNAME=admin
+      - ME_CONFIG_MONGODB_ADMINPASSWORD=password123
+      - ME_CONFIG_MONGODB_SERVER=mongodb
+    depends_on:
+      - mongodb
+    networks:
+      - periodic-network
+
+  api:
+    build: .
+    container_name: periodic-api
+    ports:
+      - "4567:4567"
+    environment:
+      - MONGODB_URI=mongodb://admin:password123@mongodb:27017/periodic-table?authSource=admin
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+    command: python src/api/main.py
+    depends_on:
+      - mongodb
+    networks:
+      - periodic-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4567/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  api-bun:
+    build:
+      context: .
+      dockerfile: Dockerfile.bun
+    container_name: periodic-api-bun
+    ports:
+      - "4568:4567"
+    environment:
+      - MONGODB_URI=mongodb://admin:password123@mongodb:27017/periodic-table?authSource=admin
+    depends_on:
+      - mongodb
+    networks:
+      - periodic-network
+
+volumes:
+  mongodb_data:
+
+networks:
+  periodic-network:
+    driver: bridge
