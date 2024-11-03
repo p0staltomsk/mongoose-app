@@ -128,7 +128,20 @@ const PeriodicTable: React.FC = () => {
     controlsRef.current = new TrackballControls(cameraRef.current, rendererRef.current.domElement);
     controlsRef.current.minDistance = 500;
     controlsRef.current.maxDistance = 8000;
+    controlsRef.current.enableZoom = true;
+    controlsRef.current.zoomSpeed = 1.0;
+    controlsRef.current.rotateSpeed = 0.5;
+    controlsRef.current.enableDamping = true;
+    controlsRef.current.dampingFactor = 0.05;
     controlsRef.current.addEventListener('change', render);
+
+    const animate = () => {
+      requestAnimationFrame(animate);
+      controlsRef.current?.update();
+      render();
+    };
+
+    animate();
 
     const initializeTable = async () => {
       const customElements = await loadElements();
