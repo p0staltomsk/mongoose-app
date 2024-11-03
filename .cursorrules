@@ -1,0 +1,17 @@
+Root path: /var/www/html/mongoose-app/
+
+Main Components:
+    /var/www/html/mongoose-app/src/components/CustomElementCreator.tsx
+    /var/www/html/mongoose-app/src/components/ElementCounter.tsx
+    /var/www/html/mongoose-app/src/components/PeriodicTable.tsx
+
+Static tables:
+    /var/www/html/mongoose-app/src/data/periodicTable.ts
+
+Database:
+    /var/www/html/mongoose-app/src/scripts/initDb.ts
+
+Models (why are there 3 of the same file?):
+    /var/www/html/mongoose-app/src/models/element.d.ts
+    /var/www/html/mongoose-app/src/models/element.js
+    /var/www/html/mongoose-app/src/models/element.ts
