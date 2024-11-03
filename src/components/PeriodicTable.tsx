@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { CSS3DRenderer, CSS3DObject } from 'three/examples/jsm/renderers/CSS3DRenderer.js';
-import { TrackballControls } from 'three/examples/jsm/controls/TrackballControls.js';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import TWEEN from '@tweenjs/tween.js';
 import { formatPeriodicData, type PeriodicElement } from '../data/periodicTable';
 import '../styles/PeriodicTable.css';
@@ -21,13 +21,14 @@ const PeriodicTable: React.FC = () => {
     type: 'success' | 'error';
   } | null>(null);
   const [elements, setElements] = useState<PeriodicElement[]>([]);
+  const [isHeartCrowned, setIsHeartCrowned] = useState(false);
 
   const sceneRef = useRef<THREE.Scene>(new THREE.Scene());
   const cameraRef = useRef<THREE.PerspectiveCamera>(
     new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 10000)
   );
   const rendererRef = useRef<CSS3DRenderer>();
-  const controlsRef = useRef<TrackballControls>();
+  const controlsRef = useRef<OrbitControls>();
   const objectsRef = useRef<CSS3DObject[]>([]);
   const targetsRef = useRef<{ [key in ViewMode]: THREE.Object3D[] }>({
     table: [],
@@ -116,28 +117,196 @@ const PeriodicTable: React.FC = () => {
     }
   };
 
+  const updateControlsForView = (view: ViewMode) => {
+    if (!controlsRef.current) return;
+
+    controlsRef.current.enableDamping = true;
+    controlsRef.current.dampingFactor = 0.05;
+    controlsRef.current.zoomSpeed = 1.0;
+
+    switch (view) {
+      case 'table':
+        controlsRef.current.minDistance = 2000;
+        controlsRef.current.maxDistance = 6000;
+        controlsRef.current.enableRotate = true;
+        controlsRef.current.enablePan = true;
+        controlsRef.current.panSpeed = 1.2;
+        controlsRef.current.autoRotate = false;
+        cameraRef.current?.position.set(0, 0, 4000);
+        controlsRef.current.maxPolarAngle = Math.PI / 1.5;
+        controlsRef.current.minPolarAngle = Math.PI / 3;
+        break;
+
+      case 'sphere':
+        controlsRef.current.minDistance = 1000;
+        controlsRef.current.maxDistance = 4000;
+        controlsRef.current.enableRotate = true;
+        controlsRef.current.enablePan = true;
+        controlsRef.current.autoRotate = true;
+        controlsRef.current.autoRotateSpeed = 2.0;
+        break;
+
+      case 'helix':
+        controlsRef.current.minDistance = 1000;
+        controlsRef.current.maxDistance = 4000;
+        controlsRef.current.enableRotate = true;
+        controlsRef.current.enablePan = true;
+        controlsRef.current.autoRotate = true;
+        controlsRef.current.autoRotateSpeed = 4.0;
+        break;
+
+      case 'grid':
+        controlsRef.current.minDistance = 2000;
+        controlsRef.current.maxDistance = 8000;
+        controlsRef.current.enableRotate = true;
+        controlsRef.current.enablePan = true;
+        controlsRef.current.panSpeed = 1.2;
+        controlsRef.current.autoRotate = false;
+        cameraRef.current?.position.set(0, 0, 4000);
+        controlsRef.current.maxPolarAngle = Math.PI - 0.2;
+        controlsRef.current.minPolarAngle = 0.2;
+        break;
+
+      case 'heart':
+        controlsRef.current.minDistance = 800;
+        controlsRef.current.maxDistance = 2500;
+        controlsRef.current.enableRotate = true;
+        controlsRef.current.enablePan = true;
+        controlsRef.current.autoRotate = true;
+        controlsRef.current.autoRotateSpeed = isHeartCrowned ? 5.0 : 2.0;
+        break;
+    }
+  };
+
+  const handleViewChange = (view: ViewMode) => {
+    if (view === 'heart' && currentView === 'heart') {
+      setIsHeartCrowned(!isHeartCrowned);
+      if (controlsRef.current) {
+        controlsRef.current.autoRotateSpeed = !isHeartCrowned ? 5.0 : 2.0;
+      }
+      const shuffledHeartPositions = [...targetsRef.current.heart]
+        .sort(() => Math.random() - 0.5)
+        .map((_, i) => getHeartPosition(i, objectsRef.current.length));
+      transform(shuffledHeartPositions, 2000);
+      return;
+    }
+
+    setCurrentView(view);
+    updateControlsForView(view);
+    
+    let newPositions: THREE.Object3D[] = [];
+    
+    switch (view) {
+      case 'table':
+        newPositions = [...targetsRef.current.table]
+          .sort(() => Math.random() - 0.5)
+          .map((_, i) => getTablePosition(i));
+        break;
+        
+      case 'sphere':
+        newPositions = [...targetsRef.current.sphere]
+          .sort(() => Math.random() - 0.5)
+          .map((_, i) => getSpherePosition(i, objectsRef.current.length));
+        break;
+        
+      case 'helix':
+        newPositions = [...targetsRef.current.helix]
+          .sort(() => Math.random() - 0.5)
+          .map((_, i) => getHelixPosition(i));
+        break;
+        
+      case 'grid':
+        newPositions = [...targetsRef.current.grid]
+          .sort(() => Math.random() - 0.5)
+          .map((_, i) => getGridPosition(i));
+        break;
+        
+      case 'heart':
+        newPositions = [...targetsRef.current.heart]
+          .sort(() => Math.random() - 0.5)
+          .map((_, i) => getHeartPosition(i, objectsRef.current.length));
+        break;
+    }
+    
+    transform(newPositions, 2000);
+    
+    if (view === 'heart') {
+      if (cameraRef.current) {
+        cameraRef.current.position.z = 1500;
+      }
+      createFireParticles();
+      setTimeout(pulseHeart, 2000);
+    } else {
+      resetElementColors();
+      if (particlesRef.current) {
+        sceneRef.current.remove(particlesRef.current);
+      }
+      
+      if (cameraRef.current) {
+        switch (view) {
+          case 'table':
+            cameraRef.current.position.z = 4000;
+            break;
+          case 'sphere':
+            cameraRef.current.position.z = 3000;
+            break;
+          case 'helix':
+            cameraRef.current.position.z = 3500;
+            break;
+          case 'grid':
+            cameraRef.current.position.z = 4000;
+            break;
+        }
+      }
+    }
+  };
+
   useEffect(() => {
     if (!containerRef.current) return;
 
     cameraRef.current.position.z = 4000;
+    cameraRef.current.position.y = 0;
+    cameraRef.current.position.x = 0;
 
     rendererRef.current = new CSS3DRenderer();
     rendererRef.current.setSize(window.innerWidth, window.innerHeight);
     containerRef.current.appendChild(rendererRef.current.domElement);
 
-    controlsRef.current = new TrackballControls(cameraRef.current, rendererRef.current.domElement);
-    controlsRef.current.minDistance = 500;
-    controlsRef.current.maxDistance = 8000;
-    controlsRef.current.enableZoom = true;
-    controlsRef.current.zoomSpeed = 1.0;
-    controlsRef.current.rotateSpeed = 0.5;
-    controlsRef.current.enableDamping = true;
-    controlsRef.current.dampingFactor = 0.05;
-    controlsRef.current.addEventListener('change', render);
+    controlsRef.current = new OrbitControls(cameraRef.current, rendererRef.current.domElement);
+    
+    if (controlsRef.current) {
+      controlsRef.current.minDistance = 1000;
+      controlsRef.current.maxDistance = 8000;
+      
+      controlsRef.current.enableDamping = true;
+      controlsRef.current.dampingFactor = 0.05;
+      
+      controlsRef.current.rotateSpeed = 0.5;
+      controlsRef.current.zoomSpeed = 1.0;
+      controlsRef.current.panSpeed = 0.8;
+
+      controlsRef.current.maxPolarAngle = Math.PI / 1.5;
+      controlsRef.current.minPolarAngle = Math.PI / 3;
+
+      controlsRef.current.enableZoom = true;
+      controlsRef.current.enableRotate = true;
+      controlsRef.current.enablePan = true;
+      
+      controlsRef.current.mouseButtons = {
+        LEFT: THREE.MOUSE.ROTATE,
+        MIDDLE: THREE.MOUSE.DOLLY,
+        RIGHT: THREE.MOUSE.PAN
+      };
+
+      controlsRef.current.addEventListener('change', render);
+    }
 
     const animate = () => {
       requestAnimationFrame(animate);
-      controlsRef.current?.update();
+      TWEEN.update();
+      if (controlsRef.current) {
+        controlsRef.current.update();
+      }
       render();
     };
 
@@ -224,16 +393,16 @@ const PeriodicTable: React.FC = () => {
         cameraRef.current.aspect = window.innerWidth / window.innerHeight;
         cameraRef.current.updateProjectionMatrix();
         rendererRef.current.setSize(window.innerWidth, window.innerHeight);
-
-        // Адаптивное расстояние камеры
+        
         const isMobile = window.innerWidth <= 768;
-        if (currentView === 'table') {
-          cameraRef.current.position.z = isMobile ? 6000 : 4000;
-        } else if (currentView === 'heart') {
-          cameraRef.current.position.z = isMobile ? 2000 : 1500;
+        if (isMobile) {
+          if (controlsRef.current) {
+            controlsRef.current.enablePan = false;
+            controlsRef.current.rotateSpeed = 0.7;
+            controlsRef.current.zoomSpeed = 0.7;
+          }
         }
-        // ... остальные виды ...
-
+        
         render();
       }
     };
@@ -246,6 +415,7 @@ const PeriodicTable: React.FC = () => {
         containerRef.current.removeChild(rendererRef.current.domElement);
       }
       if (controlsRef.current) {
+        controlsRef.current.removeEventListener('change', render);
         controlsRef.current.dispose();
       }
     };
@@ -304,36 +474,6 @@ const PeriodicTable: React.FC = () => {
     return object;
   };
 
-  const handleViewChange = (view: ViewMode) => {
-    setCurrentView(view);
-    
-    if (view === 'heart') {
-      const shuffledPositions = [...targetsRef.current.heart]
-        .sort(() => Math.random() - 0.5)
-        .map((_, i) => getHeartPosition(i, objectsRef.current.length));
-      
-      transform(shuffledPositions, 2000);
-      cameraRef.current.position.z = 1500;
-      createFireParticles();
-      setTimeout(pulseHeart, 2000);
-    } else {
-      transform(targetsRef.current[view], 2000);
-      resetElementColors();
-      if (particlesRef.current) {
-        sceneRef.current.remove(particlesRef.current);
-      }
-      if (view === 'table') {
-        cameraRef.current.position.z = 4000;
-      } else if (view === 'sphere') {
-        cameraRef.current.position.z = 3000;
-      } else if (view === 'helix') {
-        cameraRef.current.position.z = 3500;
-      } else if (view === 'grid') {
-        cameraRef.current.position.z = 4000;
-      }
-    }
-  };
-
   const createFireParticles = () => {
     const particleCount = 500;
     const particles = new BufferGeometry();
@@ -373,35 +513,59 @@ const PeriodicTable: React.FC = () => {
   };
 
   const pulseHeart = () => {
-    if (currentView === 'heart') {
-      const duration = 2000;
-      const scaleMin = 0.85;
-      const scaleMax = 1.15;
-      
-      objectsRef.current.forEach((object) => {
-        const originalPos = object.position.clone();
-        
-        new TWEEN.Tween({
-          scale: scaleMin,
-          intensity: 0
+    if (currentView !== 'heart') return;
+
+    const duration = isHeartCrowned ? 600 : 1000;
+    
+    objectsRef.current.forEach((object) => {
+      const element = object.element as HTMLElement;
+      if (!element) return;
+
+      // Базовая пульсация
+      new TWEEN.Tween({ scale: 0.8 })
+        .to({ scale: 1.2 }, duration)
+        .easing(TWEEN.Easing.Quadratic.InOut)
+        .onUpdate(({ scale }) => {
+          object.scale.setScalar(scale);
         })
-          .to({
-            scale: scaleMax,
-            intensity: 1
-          }, duration)
-          .easing(TWEEN.Easing.Sinusoidal.InOut)
-          .onUpdate(({ scale, intensity }) => {
-            object.scale.setScalar(scale);
-            const element = object.element as HTMLElement;
-            if (element) {
-              const opacity = 0.5 + intensity * 0.5;
-              element.style.backgroundColor = `rgba(255,0,0,${opacity})`;
-            }
-          })
-          .repeat(Infinity)
-          .yoyo(true)
-          .start();
-      });
+        .repeat(Infinity)
+        .yoyo(true)
+        .start();
+
+      // Пульсация цвета и свечения
+      new TWEEN.Tween({ intensity: 0 })
+        .to({ intensity: 1 }, duration)
+        .easing(TWEEN.Easing.Quadratic.InOut)
+        .onUpdate(({ intensity }) => {
+          // Основной цвет
+          const red = Math.floor(255 * (0.7 + intensity * 0.3));
+          const opacity = 0.6 + intensity * 0.4;
+          
+          // Размер свечения
+          const glowSize = isHeartCrowned ? 25 : 15;
+          
+          // Применяем стили
+          element.style.backgroundColor = `rgba(${red},0,0,${opacity})`;
+          element.style.boxShadow = `0 0 ${glowSize}px rgba(255,0,0,${opacity})`;
+        })
+        .repeat(Infinity)
+        .yoyo(true)
+        .start();
+    });
+
+    // Анимация частиц огня
+    if (particlesRef.current) {
+      const material = particlesRef.current.material as PointsMaterial;
+      new TWEEN.Tween({ size: 3, opacity: 0.4 })
+        .to({ size: 8, opacity: 0.8 }, duration)
+        .easing(TWEEN.Easing.Quadratic.InOut)
+        .onUpdate(({ size, opacity }) => {
+          material.size = size;
+          material.opacity = opacity;
+        })
+        .repeat(Infinity)
+        .yoyo(true)
+        .start();
     }
   };
 
@@ -433,16 +597,49 @@ const PeriodicTable: React.FC = () => {
           {notification.message}
         </div>
       )}
-      <div className="controls">
-        <button onClick={() => handleViewChange('table')}>TABLE</button>
-        <button onClick={() => handleViewChange('sphere')}>SPHERE</button>
-        <button onClick={() => handleViewChange('helix')}>HELIX</button>
-        <button onClick={() => handleViewChange('grid')}>GRID</button>
+      <div className="controls fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 flex flex-row gap-2 bg-black bg-opacity-50 p-2 rounded-full">
+        <button 
+          onClick={() => handleViewChange('table')}
+          className={`px-3 py-1 rounded-full text-sm font-medium transition-all duration-200 hover:scale-110
+            ${currentView === 'table' ? 'bg-blue-500 shadow-lg shadow-blue-500/50' : 'bg-gray-700 hover:bg-gray-600'} text-white`}
+        >
+          TABLE
+        </button>
+        <button 
+          onClick={() => handleViewChange('sphere')}
+          className={`px-3 py-1 rounded-full text-sm font-medium transition-all duration-200 hover:scale-110
+            ${currentView === 'sphere' ? 'bg-blue-500 shadow-lg shadow-blue-500/50' : 'bg-gray-700 hover:bg-gray-600'} text-white`}
+        >
+          SPHERE
+        </button>
+        <button 
+          onClick={() => handleViewChange('helix')}
+          className={`px-3 py-1 rounded-full text-sm font-medium transition-all duration-200 hover:scale-110
+            ${currentView === 'helix' ? 'bg-blue-500 shadow-lg shadow-blue-500/50' : 'bg-gray-700 hover:bg-gray-600'} text-white`}
+        >
+          HELIX
+        </button>
+        <button 
+          onClick={() => handleViewChange('grid')}
+          className={`px-3 py-1 rounded-full text-sm font-medium transition-all duration-200 hover:scale-110
+            ${currentView === 'grid' ? 'bg-blue-500 shadow-lg shadow-blue-500/50' : 'bg-gray-700 hover:bg-gray-600'} text-white`}
+        >
+          GRID
+        </button>
         <button 
           onClick={() => handleViewChange('heart')}
-          data-active={currentView === 'heart'}
+          className={`px-3 py-1 rounded-full text-sm font-medium transition-all duration-200 hover:scale-110
+            ${currentView === 'heart' 
+              ? `bg-red-500 shadow-lg ${isHeartCrowned ? 'ring-2 ring-yellow-400' : 'shadow-red-500/50'}` 
+              : 'bg-gray-700 hover:bg-gray-600'} 
+            text-white relative`}
         >
-          ❤️‍🔥
+          {isHeartCrowned ? '👑' : '❤️‍🔥'}
+          {currentView === 'heart' && !isHeartCrowned && (
+            <span className="absolute -top-1 -right-1 text-xs bg-yellow-400 rounded-full px-1 animate-pulse">
+              👑
+            </span>
+          )}
         </button>
       </div>
       <CustomElementCreator 

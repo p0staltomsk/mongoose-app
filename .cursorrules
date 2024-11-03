@@ -1,17 +1,52 @@
-Root path: /var/www/html/mongoose-app/
+Root path: /
+
+Documentation:
+    /src/features.md
 
 Main Components:
-    /var/www/html/mongoose-app/src/components/CustomElementCreator.tsx
-    /var/www/html/mongoose-app/src/components/ElementCounter.tsx
-    /var/www/html/mongoose-app/src/components/PeriodicTable.tsx
+    /src/components/CustomElementCreator.tsx
+    /src/components/ElementCounter.tsx
+    /src/components/PeriodicTable.tsx
 
 Static tables:
-    /var/www/html/mongoose-app/src/data/periodicTable.ts
+    /src/data/periodicTable.ts
 
 Database:
-    /var/www/html/mongoose-app/src/scripts/initDb.ts
+    /src/scripts/initDb.ts
 
 Models (why are there 3 of the same file?):
-    /var/www/html/mongoose-app/src/models/element.d.ts
-    /var/www/html/mongoose-app/src/models/element.js
-    /var/www/html/mongoose-app/src/models/element.ts
+    /src/models/element.d.ts
+    /src/models/element.js
+    /src/models/element.ts
+
+Infrastructure:
+    /package.json
+    /tsconfig.json
+    /webpack.config.js
+    /.env
+    /.gitignore
+    /jest.config.js
+    /babel.config.js
+    /README.md
+
+Docker:
+    /docker-compose.yml      # Основной файл оркестрации контейнеров
+    /Dockerfile             # Сборка Python API контейнера
+    /requirements.txt       # Python зависимости для API
+
+Container Architecture:
+    mongodb:                # База данных MongoDB
+        port: 27019:27017
+        volume: mongodb_data
+        network: periodic-network
+
+    mongo-express:          # Web-интерфейс для MongoDB
+        port: 8082:8081
+        depends_on: mongodb
+        network: periodic-network
+
+    api:                    # Python API сервис
+        port: 4567:4567
+        volume: ./src:/app/src
+        depends_on: mongodb
+        network: periodic-network
