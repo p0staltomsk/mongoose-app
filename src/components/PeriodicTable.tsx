@@ -32,7 +32,7 @@ const PeriodicTable: React.FC = () => {
   const controlsRef = useRef<OrbitControls>();
   const objectsRef = useRef<CSS3DObject[]>([]);
   const particlesRef = useRef<Points>();
-  const targetsRef = useRef<{ [key in ViewMode]: THREE.Object3D[] }>({
+  const targetsRef = useRef<Record<ViewMode, THREE.Object3D[]>>({
     table: [],
     sphere: [],
     helix: [],
@@ -195,48 +195,133 @@ const PeriodicTable: React.FC = () => {
   );
 
   const handleViewChange = (view: ViewMode) => {
+    // Добавляем функцию очистки эффектов перед сменой вида
+    const cleanupEffects = () => {
+      TWEEN.removeAll();
+      if (particlesRef.current) {
+        sceneRef.current.remove(particlesRef.current);
+      }
+      // Очищаем только если переходим не на сердце
+      if (currentView !== 'heart') {
+        resetElementColors();
+      }
+    };
+
     // Если нажали на текущий вид - перемешиваем элементы
     if (view === currentView) {
-      setShapeState(prev => ({ ...prev, isReshuffling: true }));
-      
       const total = objectsRef.current.length;
-      let newPositions: THREE.Object3D[] = [];
+      const shuffledIndices = Array.from({ length: total }, (_, i) => i)
+        .sort(() => Math.random() - 0.5);
       
-      switch (view) {
-        case 'heart':
-          // Обработка короны для сердца
-          setIsHeartCrowned(!isHeartCrowned);
-          if (controlsRef.current) {
-            controlsRef.current.autoRotateSpeed = !isHeartCrowned ? 5.0 : 2.0;
+      let newPositions: THREE.Object3D[] = shuffledIndices.map((_, i) => {
+        switch (view) {
+          case 'star':
+            return viewPositions.getPositionForView('star', i, total);
+          case 'heart':
+            return viewPositions.getPositionForView('heart', i, total);
+          case 'sphere': {
+            const pos = viewPositions.getPositionForView('sphere', i, total);
+            const vector = new THREE.Vector3(pos.x, pos.y, pos.z);
+            const radius = Math.random() * 200 + 800;
+            return vector.normalize().multiplyScalar(radius);
           }
-          newPositions = Array.from({ length: total }, (_, i) => 
-            viewPositions.getPositionForView('heart', i, total));
-          break;
-        case 'star':
-          newPositions = Array.from({ length: total }, (_, i) => 
-            viewPositions.getPositionForView('star', i, total));
-          break;
-        default:
-          newPositions = Array.from({ length: total }, (_, i) => 
-            viewPositions.getPositionForView(view, i, total));
-      }
+          case 'helix':
+            const helixPos = viewPositions.getPositionForView('helix', i, total);
+            helixPos.y += (Math.random() - 0.5) * 200;
+            return helixPos;
+          case 'grid': {
+            // Для грида просто случайное мерцание без изменения цвета
+            const pos = viewPositions.getPositionForView('grid', i, total);
+            if (Math.random() > 0.8) { // 20% элементов будут мерцать
+              setTimeout(() => {
+                const element = objectsRef.current[i].element as HTMLElement;
+                if (element) {
+                  new TWEEN.Tween({ opacity: 1 })
+                    .to({ opacity: 0.3 }, 1500)
+                    .easing(TWEEN.Easing.Sinusoidal.InOut)
+                    .yoyo(true)
+                    .repeat(1)
+                    .onUpdate(({ opacity }) => {
+                      element.style.opacity = String(opacity);
+                    })
+                    .start();
+                }
+              }, Math.random() * 2000);
+            }
+            return pos;
+          }
+          default: {
+            // Для таблицы сохраняем классический вид и цвета
+            const pos = viewPositions.getPositionForView('table', i, total);
+            return pos;
+          }
+        }
+      });
 
-      // Перемешиваем позиции
-      newPositions = newPositions
-        .map(value => ({ value, sort: Math.random() }))
-        .sort((a, b) => a.sort - b.sort)
-        .map(({ value }) => value);
+      // Применяем анимации без вращения
+      objectsRef.current.forEach((object, i) => {
+        const element = object.element as HTMLElement;
+        if (!element) return;
 
-      transform(newPositions, 1000);
-      
-      setTimeout(() => {
-        setShapeState(prev => ({ ...prev, isReshuffling: false }));
-      }, 1000);
-      
+        setTimeout(() => {
+          // Только плавное движение
+          new TWEEN.Tween(object.position)
+            .to({
+              x: newPositions[i].x,
+              y: newPositions[i].y,
+              z: newPositions[i].z
+            }, 2000)
+            .easing(TWEEN.Easing.Sinusoidal.InOut) // Более плавное движение
+            .start();
+
+          // Легкая пульсация масштаба только для сердца
+          if (view === 'heart') {
+            const initialScale = object.scale.x;
+            new TWEEN.Tween(object.scale)
+              .to({ 
+                x: initialScale * 1.2, 
+                y: initialScale * 1.2, 
+                z: initialScale * 1.2 
+              }, 1000)
+              .easing(TWEEN.Easing.Sinusoidal.InOut)
+              .yoyo(true)
+              .repeat(1)
+              .start();
+          }
+
+          // Обновляем цвета только для специальных видов
+          switch (view) {
+            case 'star':
+              const isTopTriangle = i % 2 === 0;
+              element.style.backgroundColor = isTopTriangle 
+                ? `rgba(255,255,255,0.9)`
+                : `rgba(0,56,184,0.9)`;
+              element.style.boxShadow = isTopTriangle
+                ? `0 0 30px rgba(135,206,235,0.7)`
+                : `0 0 30px rgba(255,255,255,0.7)`;
+              break;
+            case 'heart':
+              element.style.backgroundColor = `rgba(255,0,0,0.9)`;
+              element.style.boxShadow = `0 0 30px rgba(255,0,0,0.7)`;
+              break;
+            case 'sphere':
+            case 'helix':
+            case 'grid':
+            case 'table':
+              // Сохраняем оригинальные цвета
+              const opacity = 0.7 + Math.random() * 0.3;
+              element.style.backgroundColor = `rgba(0,127,127,${opacity})`;
+              element.style.boxShadow = `0 0 20px rgba(0,255,255,0.5)`;
+              break;
+          }
+        }, Math.random() * 300); // Уменьшаем задержку для более синхронного движения
+      });
+
       return;
     }
 
-    // Обычная смена вида
+    // При смене вида сначала очищаем эффекты
+    cleanupEffects();
     setCurrentView(view);
     updateControlsForView(view);
     
@@ -285,20 +370,22 @@ const PeriodicTable: React.FC = () => {
       if (cameraRef.current) {
         cameraRef.current.position.z = 1500;
       }
-      createFireParticles();
-      setTimeout(() => {
-        heartEffect.pulseHeart();
-      }, 2000);
+      // Запускаем эффекты сердца только если переходим с другого вида
+      if (currentView !== 'heart') {
+        createFireParticles();
+        setTimeout(() => {
+          heartEffect.pulseHeart();
+        }, 2000);
+      }
     } else if (view === 'star') {
       if (cameraRef.current) {
         cameraRef.current.position.z = 3000;
       }
       starEffect.animateStarOfDavid();
     } else {
-      // Сбрасываем эффекты для других видов
-      resetElementColors();
-      if (particlesRef.current) {
-        sceneRef.current.remove(particlesRef.current);
+      // Сбрасываем эффекты только если уходим с сердца
+      if (currentView === 'heart') {
+        cleanupEffects();
       }
     }
   };

@@ -1,13 +1,32 @@
 import { ViewMode } from '../../types';
+import { CSS3DObject } from 'three/examples/jsm/renderers/CSS3DRenderer';
+import * as THREE from 'three';
 
-export type ShapeState = {
+export interface ShapeState {
   currentView: ViewMode;
   previousView: ViewMode | null;
   isTransitioning: boolean;
-  transitionPhase: 'start' | 'morph' | 'complete';
+  transitionPhase: 'start' | 'middle' | 'complete';
+  isReshuffling?: boolean;
   isCrowned?: boolean;
-  isReshuffling: boolean;
-};
+}
+
+export interface StarEffectProps {
+  isActive: boolean;
+  objects: CSS3DObject[];
+  onUpdate: () => void;
+}
+
+export interface ShapeEffectProps {
+  currentView: ViewMode;
+  objects: CSS3DObject[];
+  onUpdate: () => void;
+  isCrowned: boolean;
+}
+
+export interface ViewPositions {
+  [key: string]: THREE.Object3D[];
+}
 
 export type ShapeTransition = {
   from: ViewMode;

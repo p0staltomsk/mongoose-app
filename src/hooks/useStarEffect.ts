@@ -1,114 +1,139 @@
-import React, { useEffect, useRef, useCallback } from 'react';
-import { CSS3DRenderer, CSS3DObject } from 'three/examples/jsm/renderers/CSS3DRenderer';
+import { useEffect, useCallback } from 'react';
 import * as THREE from 'three';
 import TWEEN from '@tweenjs/tween.js';
-import { SHAPE_CONSTANTS } from '../constants/shapes';
-import { SHAPE_COLORS } from '../features/shapes/model';
+import { StarEffectProps } from '../features/shapes/model';
 
-interface UseStarEffectProps {
-  isActive: boolean;
-  objects: CSS3DObject[];
-  onUpdate: () => void;
+interface AnimationParams {
+  scale: number;
+  intensity: number;
+  rotation: number;
 }
 
-const calculateStarOfDavidPosition = (index: number, total: number) => {
-  const object = new THREE.Object3D();
-  const radius = SHAPE_CONSTANTS.STAR.RADIUS.OUTER;
-  
-  // Определяем, к какому треугольнику относится точка
-  const isFirstTriangle = index < total / 2;
-  const pointsPerTriangle = Math.floor(total / 2);
-  const localIndex = isFirstTriangle ? index : index - pointsPerTriangle;
-  
-  // Вычисляем угол для точки в треугольнике (120° между точками)
-  const angleStep = (2 * Math.PI) / 3;
-  const triangleIndex = Math.floor(localIndex / (pointsPerTriangle / 3));
-  const angle = triangleIndex * angleStep + (isFirstTriangle ? 0 : Math.PI / 3); // Поворот второго треугольника на 60°
-  
-  // Вычисляем позицию
-  const x = radius * Math.cos(angle);
-  const y = radius * Math.sin(angle);
-  // Разная высота для треугольников
-  const z = isFirstTriangle ? 50 : -50;
-  
-  // Добавляем небольшое случайное смещение для объема
-  const randomOffset = {
-    x: (Math.random() - 0.5) * 20,
-    y: (Math.random() - 0.5) * 20,
-    z: (Math.random() - 0.5) * 10
-  };
-  
-  object.position.set(
-    x + randomOffset.x,
-    y + randomOffset.y,
-    z + randomOffset.z
-  );
-  
-  // Ориентируем элементы к центру
-  const rotationAngle = Math.atan2(y, x);
-  object.rotation.set(
-    isFirstTriangle ? Math.PI / 6 : -Math.PI / 6, // Наклон к центру
-    rotationAngle,
-    isFirstTriangle ? 0 : Math.PI // Поворот для второго треугольника
-  );
-  
-  return object;
-};
+export const useStarEffect = ({ isActive, objects, onUpdate }: StarEffectProps) => {
+  const createStarOfDavid = useCallback((index: number, total: number) => {
+    const starSize = 800;
+    const innerRadius = starSize * 0.4;
+    const outerRadius = starSize;
+    
+    // Создаем точки для двух треугольников звезды Давида
+    const points: THREE.Vector3[] = [];
+    
+    // Первый треугольник (верхний)
+    for (let i = 0; i < 3; i++) {
+      const angle = (i / 3) * Math.PI * 2 + Math.PI / 6; // Поворачиваем на 30 градусов
+      // Внешняя точка
+      points.push(new THREE.Vector3(
+        Math.cos(angle) * outerRadius,
+        Math.sin(angle) * outerRadius,
+        0
+      ));
+      // Внутренняя точка
+      const innerAngle = angle + Math.PI / 3;
+      points.push(new THREE.Vector3(
+        Math.cos(innerAngle) * innerRadius,
+        Math.sin(innerAngle) * innerRadius,
+        0
+      ));
+    }
 
-export const useStarEffect = ({ isActive, objects, onUpdate }: UseStarEffectProps) => {
-  const tweensRef = useRef<TWEEN.Tween[]>([]);
-  const animationFrameRef = useRef<number>();
+    // Второй треугольник (нижний)
+    for (let i = 0; i < 3; i++) {
+      const angle = (i / 3) * Math.PI * 2 - Math.PI / 6; // Поворачиваем на -30 градусов
+      // Внешняя точка
+      points.push(new THREE.Vector3(
+        Math.cos(angle) * outerRadius,
+        Math.sin(angle) * outerRadius,
+        0
+      ));
+      // Внутренняя точка
+      const innerAngle = angle + Math.PI / 3;
+      points.push(new THREE.Vector3(
+        Math.cos(innerAngle) * innerRadius,
+        Math.sin(innerAngle) * innerRadius,
+        0
+      ));
+    }
+    
+    // Распределяем элементы по точкам звезды
+    const basePointIndex = index % points.length;
+    const nextPointIndex = (basePointIndex + 1) % points.length;
+    
+    const basePoint = points[basePointIndex];
+    const nextPoint = points[nextPointIndex];
 
-  const animateStar = useCallback(() => {
-    if (!isActive || !objects.length) return;
+    // Создаем плавное движение между точками
+    const time = Date.now() * 0.0002; // Супер медленное движение
+    const floatFactor = (Math.sin(time + index * 0.5) + 1) * 0.5;
+    
+    const floatingPoint = new THREE.Vector3(
+      basePoint.x + (nextPoint.x - basePoint.x) * floatFactor,
+      basePoint.y + (nextPoint.y - basePoint.y) * floatFactor,
+      basePoint.z + (nextPoint.z - basePoint.z) * floatFactor
+    );
 
-    tweensRef.current.forEach(tween => tween.stop());
-    tweensRef.current = [];
+    // Добавляем медленное колебание по Z для объема
+    const wobbleAmount = 40;
+    const wobble = Math.sin(time * 1.5 + index * 0.2) * wobbleAmount;
+    floatingPoint.z += wobble;
 
-    objects.forEach((object, index) => {
+    return floatingPoint;
+  }, []);
+
+  const shuffleElements = useCallback(() => {
+    if (!isActive) return;
+
+    // Создаем новые случайные позиции для всех точек
+    const shuffledIndices = Array.from({ length: objects.length }, (_, i) => i)
+      .sort(() => Math.random() - 0.5);
+
+    objects.forEach((object, i) => {
       const element = object.element as HTMLElement;
       if (!element) return;
 
-      // Анимация вращения и свечения
-      const tween = new TWEEN.Tween({
-        rotation: 0,
-        glow: 0,
-        brightness: 0
-      })
-        .to({
-          rotation: Math.PI * 2,
-          glow: 1,
-          brightness: 1
-        }, SHAPE_CONSTANTS.STAR.ROTATION_DURATION)
-        .easing(TWEEN.Easing.Sinusoidal.InOut)
-        .onUpdate(({ rotation, glow, brightness }) => {
-          // Вращение элемента
-          object.rotation.z = rotation * 0.1;
+      // Берем случайную позицию из перемешанного массива
+      const newPosition = createStarOfDavid(shuffledIndices[i], objects.length);
 
-          // Градиентное свечение
-          const blue = Math.floor(200 + brightness * 55);
-          const opacity = 0.5 + glow * 0.3;
-          const glowSize = SHAPE_CONSTANTS.STAR.COLORS.GLOW.MIN_SIZE + 
-            glow * (SHAPE_CONSTANTS.STAR.COLORS.GLOW.MAX_SIZE - SHAPE_CONSTANTS.STAR.COLORS.GLOW.MIN_SIZE);
-          
-          element.style.background = `
-            radial-gradient(circle at 50% 50%, 
-              rgba(0,100,${blue},${opacity}) 0%,
-              rgba(0,50,${blue - 50},${opacity * 0.8}) 70%,
-              rgba(0,0,${blue - 100},${opacity * 0.6}) 100%)
-          `;
-          
-          element.style.boxShadow = `
-            0 0 ${glowSize}px rgba(0,100,255,${0.3 + glow * 0.4}),
-            inset 0 0 ${glowSize/2}px rgba(0,150,255,${0.2 + glow * 0.3})
-          `;
-        })
-        .repeat(Infinity)
-        .start();
+      // Добавляем случайную задержку для каждого элемента
+      setTimeout(() => {
+        new TWEEN.Tween(object.position)
+          .to({
+            x: newPosition.x,
+            y: newPosition.y,
+            z: newPosition.z
+          }, 3000) // Плавное перемещение
+          .easing(TWEEN.Easing.Exponential.InOut)
+          .start();
 
-      tweensRef.current.push(tween);
+        // Добавляем эффект вращения при перемешивании
+        new TWEEN.Tween(object.rotation)
+          .to({
+            z: Math.PI * 2 * (Math.random() > 0.5 ? 1 : -1)
+          }, 3000)
+          .easing(TWEEN.Easing.Exponential.InOut)
+          .start();
+
+        // Добавляем пульсацию при перемешивании
+        const initialScale = object.scale.x;
+        new TWEEN.Tween(object.scale)
+          .to({ x: initialScale * 1.3, y: initialScale * 1.3, z: initialScale * 1.3 }, 1500)
+          .easing(TWEEN.Easing.Quadratic.Out)
+          .yoyo(true)
+          .repeat(1)
+          .start();
+
+        // Усиливаем свечение при перемешивании
+        const intensity = Math.random() * 0.5 + 0.5;
+        const isTopTriangle = i % 2 === 0;
+        if (isTopTriangle) {
+          element.style.backgroundColor = `rgba(255,255,255,${0.8 + intensity * 0.2})`;
+          element.style.boxShadow = `0 0 50px rgba(135,206,235,${intensity})`;
+        } else {
+          element.style.backgroundColor = `rgba(0,56,184,${0.8 + intensity * 0.2})`;
+          element.style.boxShadow = `0 0 50px rgba(255,255,255,${intensity})`;
+        }
+      }, Math.random() * 500); // Случайная задержка до 500мс
     });
-  }, [isActive, objects, onUpdate]);
+  }, [isActive, objects, createStarOfDavid]);
 
   const animateStarOfDavid = useCallback(() => {
     if (!isActive) return;
@@ -117,57 +142,72 @@ export const useStarEffect = ({ isActive, objects, onUpdate }: UseStarEffectProp
       const element = object.element as HTMLElement;
       if (!element) return;
 
-      const isFirstTriangle = index < objects.length / 2;
-      
-      new TWEEN.Tween({ rotation: 0, intensity: 0 })
-        .to({ rotation: Math.PI * 2, intensity: 1 }, 5000)
+      // Медленное движение по звезде
+      const updatePosition = () => {
+        const newPosition = createStarOfDavid(index, objects.length);
+        
+        new TWEEN.Tween(object.position)
+          .to({
+            x: newPosition.x,
+            y: newPosition.y,
+            z: newPosition.z
+          }, 5000) // Еще медленнее!
+          .easing(TWEEN.Easing.Sinusoidal.InOut)
+          .onComplete(() => {
+            setTimeout(() => updatePosition(), Math.random() * 2000 + 2000);
+          })
+          .start();
+      };
+
+      updatePosition();
+
+      // Анимация вращения и свечения
+      const params: AnimationParams = {
+        scale: 0.9,
+        intensity: 0,
+        rotation: 0
+      };
+
+      new TWEEN.Tween(params)
+        .to({
+          scale: 1.1,
+          intensity: 1,
+          rotation: Math.PI / 3
+        }, 4000)
         .easing(TWEEN.Easing.Sinusoidal.InOut)
-        .onUpdate(({ rotation, intensity }) => {
-          object.rotation.z += isFirstTriangle ? 0.001 : -0.001;
+        .onUpdate(({ scale, intensity, rotation }) => {
+          object.scale.setScalar(scale);
+          object.rotation.z = rotation;
           
-          const opacity = 0.5 + intensity * 0.3;
-          const glowSize = 10 + intensity * 15;
-          
-          element.style.background = `
-            radial-gradient(circle at 50% 50%,
-              ${SHAPE_COLORS.STAR.background}${opacity}) 0%,
-              ${SHAPE_COLORS.STAR.background}${opacity * 0.8}) 70%,
-              ${SHAPE_COLORS.STAR.background}${opacity * 0.6}) 100%)
-          `;
-          
-          element.style.boxShadow = `
-            0 0 ${glowSize}px ${SHAPE_COLORS.STAR.glow}${opacity}),
-            inset 0 0 ${glowSize/2}px ${SHAPE_COLORS.STAR.glow}${opacity * 0.8})
-          `;
+          // Цвета флага Израиля - белый и синий
+          const isTopTriangle = index % 2 === 0;
+          if (isTopTriangle) {
+            // Белый с голубым свечением
+            element.style.backgroundColor = `rgba(255,255,255,${0.7 + intensity * 0.3})`;
+            element.style.boxShadow = `0 0 30px rgba(135,206,235,${0.5 + intensity * 0.5})`;
+          } else {
+            // Синий с белым свечением
+            element.style.backgroundColor = `rgba(0,56,184,${0.7 + intensity * 0.3})`;
+            element.style.boxShadow = `0 0 30px rgba(255,255,255,${0.5 + intensity * 0.5})`;
+          }
         })
         .repeat(Infinity)
+        .yoyo(true)
         .start();
     });
-  }, [isActive]);
+  }, [isActive, objects, createStarOfDavid]);
 
   useEffect(() => {
     if (isActive) {
-      animateStar();
       animateStarOfDavid();
-      const animate = () => {
-        TWEEN.update();
-        onUpdate();
-        animationFrameRef.current = requestAnimationFrame(animate);
-      };
-      animate();
     }
-
     return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-      tweensRef.current.forEach(tween => tween.stop());
-      tweensRef.current = [];
+      TWEEN.removeAll();
     };
-  }, [isActive, animateStar, animateStarOfDavid, onUpdate]);
+  }, [isActive, animateStarOfDavid]);
 
   return {
-    animateStar,
-    animateStarOfDavid
+    animateStarOfDavid,
+    shuffleElements
   };
 };
