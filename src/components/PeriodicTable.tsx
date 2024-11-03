@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { CSS3DRenderer, CSS3DObject } from 'three/examples/jsm/renderers/CSS3DRenderer.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
@@ -8,11 +8,39 @@ import '../styles/PeriodicTable.css';
 import { Points, BufferGeometry, Float32BufferAttribute, PointsMaterial } from 'three';
 import CustomElementCreator from './CustomElementCreator';
 import { ElementCounter } from './ElementCounter';
-
-type ViewMode = 'table' | 'sphere' | 'helix' | 'grid' | 'heart';
+import { useViewPositions } from '../hooks/useViewPositions';
+import { useHeartEffect } from '../hooks/useHeartEffect';
+import { useShapeEffects } from '../hooks/useShapeEffects';
+import { ViewMode } from '../types';
+import { SHAPE_CONSTANTS } from '../constants/shapes';
+import { createObject3D, transformObjects } from '../utils/threeHelpers';
+import { useStarEffect } from '../hooks/useStarEffect';
+import { useShapeTransition } from '../features/shapes/lib/useShapeTransition';
+import { ShapeState } from '../features/shapes/model';
 
 const PeriodicTable: React.FC = () => {
+  const render = useCallback(() => {
+    if (rendererRef.current && sceneRef.current && cameraRef.current) {
+      rendererRef.current.render(sceneRef.current, cameraRef.current);
+    }
+  }, []);
+
   const containerRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef(new THREE.Scene());
+  const cameraRef = useRef(new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 10000));
+  const rendererRef = useRef<CSS3DRenderer>();
+  const controlsRef = useRef<OrbitControls>();
+  const objectsRef = useRef<CSS3DObject[]>([]);
+  const particlesRef = useRef<Points>();
+  const targetsRef = useRef<{ [key in ViewMode]: THREE.Object3D[] }>({
+    table: [],
+    sphere: [],
+    helix: [],
+    grid: [],
+    heart: [],
+    star: []
+  });
+
   const [currentView, setCurrentView] = useState<ViewMode>('table');
   const [loading, setLoading] = useState(true);
   const [isFormVisible, setIsFormVisible] = useState(false);
@@ -23,27 +51,18 @@ const PeriodicTable: React.FC = () => {
   const [elements, setElements] = useState<PeriodicElement[]>([]);
   const [isHeartCrowned, setIsHeartCrowned] = useState(false);
 
-  const sceneRef = useRef<THREE.Scene>(new THREE.Scene());
-  const cameraRef = useRef<THREE.PerspectiveCamera>(
-    new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 10000)
-  );
-  const rendererRef = useRef<CSS3DRenderer>();
-  const controlsRef = useRef<OrbitControls>();
-  const objectsRef = useRef<CSS3DObject[]>([]);
-  const targetsRef = useRef<{ [key in ViewMode]: THREE.Object3D[] }>({
-    table: [],
-    sphere: [],
-    helix: [],
-    grid: [],
-    heart: []
-  });
-  const particlesRef = useRef<Points>();
+  const viewPositions = useViewPositions();
 
-  const render = () => {
-    if (rendererRef.current && sceneRef.current && cameraRef.current) {
-      rendererRef.current.render(sceneRef.current, cameraRef.current);
-    }
-  };
+  const shapeEffects = useShapeEffects({
+    currentView,
+    objects: objectsRef.current,
+    onUpdate: render,
+    isCrowned: isHeartCrowned
+  });
+
+  const transform = useCallback((targets: THREE.Object3D[], duration: number) => {
+    transformObjects(objectsRef.current, targets, duration, render);
+  }, [render]);
 
   const animateFireParticles = () => {
     requestAnimationFrame(animateFireParticles);
@@ -71,38 +90,6 @@ const PeriodicTable: React.FC = () => {
 
       particlesRef.current.geometry.attributes.position.needsUpdate = true;
     }
-  };
-
-  const transform = (targets: THREE.Object3D[], duration: number) => {
-    TWEEN.removeAll();
-
-    objectsRef.current.forEach((object, index) => {
-      const target = targets[index];
-      if (target) {
-        new TWEEN.Tween(object.position)
-          .to({ 
-            x: target.position.x, 
-            y: target.position.y, 
-            z: target.position.z 
-          }, duration)
-          .easing(TWEEN.Easing.Exponential.InOut)
-          .start();
-
-        new TWEEN.Tween(object.rotation)
-          .to({ 
-            x: target.rotation.x, 
-            y: target.rotation.y, 
-            z: target.rotation.z 
-          }, duration)
-          .easing(TWEEN.Easing.Exponential.InOut)
-          .start();
-      }
-    });
-
-    new TWEEN.Tween({})
-      .to({}, duration)
-      .onUpdate(render)
-      .start();
   };
 
   const loadElements = async () => {
@@ -175,94 +162,160 @@ const PeriodicTable: React.FC = () => {
         controlsRef.current.autoRotate = true;
         controlsRef.current.autoRotateSpeed = isHeartCrowned ? 5.0 : 2.0;
         break;
+
+      case 'star':
+        controlsRef.current.minDistance = 1500;
+        controlsRef.current.maxDistance = 4000;
+        controlsRef.current.enableRotate = true;
+        controlsRef.current.enablePan = true;
+        controlsRef.current.autoRotate = true;
+        controlsRef.current.autoRotateSpeed = 1.0;
+        break;
     }
   };
 
+  const [shapeState, setShapeState] = useState<ShapeState>({
+    currentView: 'table',
+    previousView: null,
+    isTransitioning: false,
+    transitionPhase: 'complete'
+  });
+
+  const { startTransition } = useShapeTransition(
+    shapeState,
+    (newView) => {
+      setShapeState(prev => ({
+        ...prev,
+        currentView: newView,
+        previousView: prev.currentView,
+        isTransitioning: false,
+        transitionPhase: 'complete'
+      }));
+    }
+  );
+
   const handleViewChange = (view: ViewMode) => {
-    if (view === 'heart' && currentView === 'heart') {
-      setIsHeartCrowned(!isHeartCrowned);
-      if (controlsRef.current) {
-        controlsRef.current.autoRotateSpeed = !isHeartCrowned ? 5.0 : 2.0;
+    // Если нажали на текущий вид - перемешиваем элементы
+    if (view === currentView) {
+      setShapeState(prev => ({ ...prev, isReshuffling: true }));
+      
+      const total = objectsRef.current.length;
+      let newPositions: THREE.Object3D[] = [];
+      
+      switch (view) {
+        case 'heart':
+          // Обработка короны для сердца
+          setIsHeartCrowned(!isHeartCrowned);
+          if (controlsRef.current) {
+            controlsRef.current.autoRotateSpeed = !isHeartCrowned ? 5.0 : 2.0;
+          }
+          newPositions = Array.from({ length: total }, (_, i) => 
+            viewPositions.getPositionForView('heart', i, total));
+          break;
+        case 'star':
+          newPositions = Array.from({ length: total }, (_, i) => 
+            viewPositions.getPositionForView('star', i, total));
+          break;
+        default:
+          newPositions = Array.from({ length: total }, (_, i) => 
+            viewPositions.getPositionForView(view, i, total));
       }
-      const shuffledHeartPositions = [...targetsRef.current.heart]
-        .sort(() => Math.random() - 0.5)
-        .map((_, i) => getHeartPosition(i, objectsRef.current.length));
-      transform(shuffledHeartPositions, 2000);
+
+      // Перемешиваем позиции
+      newPositions = newPositions
+        .map(value => ({ value, sort: Math.random() }))
+        .sort((a, b) => a.sort - b.sort)
+        .map(({ value }) => value);
+
+      transform(newPositions, 1000);
+      
+      setTimeout(() => {
+        setShapeState(prev => ({ ...prev, isReshuffling: false }));
+      }, 1000);
+      
       return;
     }
 
+    // Обычная смена вида
     setCurrentView(view);
     updateControlsForView(view);
     
+    // Подготавливаем новые позиции с учетом текущего количества элементов
+    const total = objectsRef.current.length;
     let newPositions: THREE.Object3D[] = [];
-    
+
+    // Генерируем позиции для выбранного вида
     switch (view) {
-      case 'table':
-        newPositions = [...targetsRef.current.table]
-          .sort(() => Math.random() - 0.5)
-          .map((_, i) => getTablePosition(i));
-        break;
-        
-      case 'sphere':
-        newPositions = [...targetsRef.current.sphere]
-          .sort(() => Math.random() - 0.5)
-          .map((_, i) => getSpherePosition(i, objectsRef.current.length));
-        break;
-        
-      case 'helix':
-        newPositions = [...targetsRef.current.helix]
-          .sort(() => Math.random() - 0.5)
-          .map((_, i) => getHelixPosition(i));
-        break;
-        
-      case 'grid':
-        newPositions = [...targetsRef.current.grid]
-          .sort(() => Math.random() - 0.5)
-          .map((_, i) => getGridPosition(i));
-        break;
-        
       case 'heart':
-        newPositions = [...targetsRef.current.heart]
-          .sort(() => Math.random() - 0.5)
-          .map((_, i) => getHeartPosition(i, objectsRef.current.length));
+        newPositions = Array.from({ length: total }, (_, i) => 
+          viewPositions.getPositionForView('heart', i, total));
         break;
+      case 'star':
+        newPositions = Array.from({ length: total }, (_, i) => 
+          viewPositions.getPositionForView('star', i, total));
+        break;
+      case 'sphere':
+        newPositions = Array.from({ length: total }, (_, i) => 
+          viewPositions.getPositionForView('sphere', i, total));
+        break;
+      case 'helix':
+        newPositions = Array.from({ length: total }, (_, i) => 
+          viewPositions.getPositionForView('helix', i, total));
+        break;
+      case 'grid':
+        newPositions = Array.from({ length: total }, (_, i) => 
+          viewPositions.getPositionForView('grid', i, total));
+        break;
+      default:
+        newPositions = Array.from({ length: total }, (_, i) => 
+          viewPositions.getPositionForView('table', i, total));
     }
-    
+
+    // Перемешиваем позиции для боле интересной анимации
+    newPositions = newPositions
+      .map(value => ({ value, sort: Math.random() }))
+      .sort((a, b) => a.sort - b.sort)
+      .map(({ value }) => value);
+
+    // Применяем трансформацию
     transform(newPositions, 2000);
-    
+
+    // Применяем специфичные эффекты для разных видов
     if (view === 'heart') {
       if (cameraRef.current) {
         cameraRef.current.position.z = 1500;
       }
       createFireParticles();
-      setTimeout(pulseHeart, 2000);
+      setTimeout(() => {
+        heartEffect.pulseHeart();
+      }, 2000);
+    } else if (view === 'star') {
+      if (cameraRef.current) {
+        cameraRef.current.position.z = 3000;
+      }
+      starEffect.animateStarOfDavid();
     } else {
+      // Сбрасываем эффекты для других видов
       resetElementColors();
       if (particlesRef.current) {
         sceneRef.current.remove(particlesRef.current);
-      }
-      
-      if (cameraRef.current) {
-        switch (view) {
-          case 'table':
-            cameraRef.current.position.z = 4000;
-            break;
-          case 'sphere':
-            cameraRef.current.position.z = 3000;
-            break;
-          case 'helix':
-            cameraRef.current.position.z = 3500;
-            break;
-          case 'grid':
-            cameraRef.current.position.z = 4000;
-            break;
-        }
       }
     }
   };
 
   useEffect(() => {
     if (!containerRef.current) return;
+
+    const cleanup = () => {
+      if (containerRef.current && rendererRef.current) {
+        containerRef.current.removeChild(rendererRef.current.domElement);
+      }
+      if (controlsRef.current) {
+        controlsRef.current.removeEventListener('change', render);
+        controlsRef.current.dispose();
+      }
+      TWEEN.removeAll();
+    };
 
     cameraRef.current.position.z = 4000;
     cameraRef.current.position.y = 0;
@@ -304,9 +357,18 @@ const PeriodicTable: React.FC = () => {
     const animate = () => {
       requestAnimationFrame(animate);
       TWEEN.update();
+      
       if (controlsRef.current) {
         controlsRef.current.update();
       }
+
+      // Обновляем эффекты в зависимости от текущего вида
+      if (currentView === 'heart') {
+        heartEffect.animateFireParticles();
+      } else if (currentView === 'star') {
+        starEffect.animateStar();
+      }
+
       render();
     };
 
@@ -374,11 +436,12 @@ const PeriodicTable: React.FC = () => {
         sceneRef.current.add(object);
         objectsRef.current.push(object);
 
-        targetsRef.current.table.push(getTablePosition(i));
-        targetsRef.current.sphere.push(getSpherePosition(i, data.length));
-        targetsRef.current.helix.push(getHelixPosition(i));
-        targetsRef.current.grid.push(getGridPosition(i));
-        targetsRef.current.heart.push(getHeartPosition(i, data.length));
+        targetsRef.current.table.push(viewPositions.getPositionForView('table', i, data.length));
+        targetsRef.current.sphere.push(viewPositions.getPositionForView('sphere', i, data.length));
+        targetsRef.current.helix.push(viewPositions.getPositionForView('helix', i, data.length));
+        targetsRef.current.grid.push(viewPositions.getPositionForView('grid', i, data.length));
+        targetsRef.current.heart.push(viewPositions.getPositionForView('heart', i, data.length));
+        targetsRef.current.star.push(viewPositions.getPositionForView('star', i, data.length));
       });
 
       setLoading(false);
@@ -409,70 +472,8 @@ const PeriodicTable: React.FC = () => {
 
     window.addEventListener('resize', handleResize);
 
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      if (containerRef.current && rendererRef.current) {
-        containerRef.current.removeChild(rendererRef.current.domElement);
-      }
-      if (controlsRef.current) {
-        controlsRef.current.removeEventListener('change', render);
-        controlsRef.current.dispose();
-      }
-    };
+    return cleanup;
   }, []);
-
-  const getTablePosition = (index: number) => {
-    const object = new THREE.Object3D();
-    const x = (index % 18) * 140 - 1330;
-    const y = -((Math.floor(index / 18)) * 180) + 990;
-    object.position.set(x, y, 0);
-    return object;
-  };
-
-  const getSpherePosition = (index: number, total: number) => {
-    const object = new THREE.Object3D();
-    const phi = Math.acos(-1 + (2 * index) / total);
-    const theta = Math.sqrt(total * Math.PI) * phi;
-    object.position.setFromSphericalCoords(800, phi, theta);
-    return object;
-  };
-
-  const getHelixPosition = (index: number) => {
-    const object = new THREE.Object3D();
-    const theta = index * 0.175 + Math.PI;
-    const y = -(index * 8) + 450;
-    object.position.setFromCylindricalCoords(900, theta, y);
-    return object;
-  };
-
-  const getGridPosition = (index: number) => {
-    const object = new THREE.Object3D();
-    object.position.x = ((index % 5) * 400) - 800;
-    object.position.y = (-(Math.floor(index / 5) % 5) * 400) + 800;
-    object.position.z = (Math.floor(index / 25)) * 1000 - 2000;
-    return object;
-  };
-
-  const getHeartPosition = (index: number, total: number) => {
-    const object = new THREE.Object3D();
-    const randomOffset = Math.random() * 0.5 - 0.25; // от -0.25 до 0.25
-    const t = ((index + randomOffset) / total) * 2 * Math.PI;
-    const scale = 30;
-    
-    const x = scale * 16 * Math.pow(Math.sin(t), 3);
-    const y = scale * (13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t));
-    const z = (Math.random() * 20) - 10;
-    
-    object.position.set(x, y, z);
-    
-    object.rotation.set(
-      Math.random() * 0.2 - 0.1,
-      Math.random() * 0.2 - 0.1,
-      Math.random() * 0.2 - 0.1
-    );
-    
-    return object;
-  };
 
   const createFireParticles = () => {
     const particleCount = 500;
@@ -588,6 +589,21 @@ const PeriodicTable: React.FC = () => {
     setTimeout(() => setNotification(null), 5000);
   };
 
+  // Добавляем новый хук
+  const heartEffect = useHeartEffect({
+    isActive: currentView === 'heart',
+    isCrowned: isHeartCrowned,
+    objects: objectsRef.current,
+    particlesRef,
+    sceneRef
+  });
+
+  const starEffect = useStarEffect({
+    isActive: currentView === 'star',
+    objects: objectsRef.current,
+    onUpdate: render
+  });
+
   return (
     <div className="relative w-full h-screen">
       <ElementCounter />
@@ -628,18 +644,28 @@ const PeriodicTable: React.FC = () => {
         </button>
         <button 
           onClick={() => handleViewChange('heart')}
+          disabled={shapeState.isTransitioning}
           className={`px-3 py-1 rounded-full text-sm font-medium transition-all duration-200 hover:scale-110
             ${currentView === 'heart' 
               ? `bg-red-500 shadow-lg ${isHeartCrowned ? 'ring-2 ring-yellow-400' : 'shadow-red-500/50'}` 
               : 'bg-gray-700 hover:bg-gray-600'} 
-            text-white relative`}
+            text-white relative ${
+              shapeState.isTransitioning ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
         >
-          {isHeartCrowned ? '👑' : '❤️‍🔥'}
-          {currentView === 'heart' && !isHeartCrowned && (
+          {shapeState.isCrowned ? '👑' : '❤️‍🔥'}
+          {shapeState.currentView === 'heart' && !shapeState.isCrowned && (
             <span className="absolute -top-1 -right-1 text-xs bg-yellow-400 rounded-full px-1 animate-pulse">
               👑
             </span>
           )}
+        </button>
+        <button 
+          onClick={() => handleViewChange('star')}
+          className={`px-3 py-1 rounded-full text-sm font-medium transition-all duration-200 hover:scale-110
+            ${currentView === 'star' ? 'bg-blue-500 shadow-lg shadow-blue-500/50' : 'bg-gray-700 hover:bg-gray-600'} text-white`}
+        >
+          ✡️
         </button>
       </div>
       <CustomElementCreator 

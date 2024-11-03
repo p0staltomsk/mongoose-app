@@ -1,0 +1,1 @@
+export type ViewMode = 'table' | 'sphere' | 'helix' | 'grid' | 'heart' | 'star'; 
