@@ -11,37 +11,19 @@ services:
     command: mongod --noauth
     networks:
       - periodic-network
-    hostname: mongodb
-
-  mongo-express:
-    image: mongo-express:latest
-    container_name: periodic-mongo-express
-    ports:
-      - "8082:8081"
-    environment:
-      - ME_CONFIG_MONGODB_URL=mongodb://mongodb:27017/
-    depends_on:
-      - mongodb
-    networks:
-      - periodic-network
 
   api:
     build: .
     container_name: periodic-api
     ports:
       - "4567:4567"
-    volumes:
-      - ./src:/app/src
     environment:
-      - MONGODB_URI=mongodb://mongodb:27017/periodic-table
-      - FLASK_ENV=development
-      - FLASK_DEBUG=1
-      - PYTHONUNBUFFERED=1
+      - FLASK_ENV=production
+      - FLASK_DEBUG=0
     depends_on:
       - mongodb
     networks:
       - periodic-network
-    command: python src/api/main.py --host 0.0.0.0
 
 volumes:
   mongodb_data:

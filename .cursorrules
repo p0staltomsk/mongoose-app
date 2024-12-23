@@ -2,45 +2,45 @@ Root path: /
 
 Active Components:
     /src/components/
-        PeriodicTable.tsx           # Основной компонент с логикой таблицы
-        CustomElementCreator.tsx     # Создание новых элементов
-        ElementCounter.tsx          # Счетчик элементов
-        ControlPanel.tsx           # Панель управления видами
-        LoadingOverlay.tsx         # Компонент загрузки
-        Notification.tsx           # Компонент уведомлений
-        ui/                        # UI компоненты
-            button.tsx             # Кнопки
-            card.tsx              # Карточки
-            icons.tsx             # Иконки
-            input.tsx             # Поля ввода
-            label.tsx             # Метки
+        PeriodicTable.tsx               # Основной компонент с логикой таблицы
+        CustomElementCreator.tsx        # Создание новых элементов
+        ElementCounter.tsx              # Счетчик элементов
+        ControlPanel.tsx                # Панель управления видами
+        LoadingOverlay.tsx              # Компонент загрузки
+        Notification.tsx                # Компонент уведомлений
+        ui/                             # UI компоненты
+            button.tsx                  # Кнопки
+            card.tsx                    # Карточки
+            icons.tsx                   # Иконки
+            input.tsx                   # Поля ввода
+            label.tsx                   # Метки
 
 Active Hooks:
     /src/hooks/
-        useHeartEffect.ts          # Эффект сердца
-        useStarEffect.ts          # Эффект звезды
-        useViewPositions.ts       # Позиционирование элементов
-        useShapeEffects.ts        # Общие эффекты фигур
-        usePeriodicTableSetup.ts  # Инициализация таблицы
+        useHeartEffect.ts               # Эффект сердца
+        useStarEffect.ts                # Эффект звезды
+        useViewPositions.ts             # Позиционирование элементов
+        useShapeEffects.ts              # Общие эффекты фигур
+        usePeriodicTableSetup.ts        # Инициализация таблицы
 
 Features (FSD):
     /src/features/shapes/
-        model.ts                  # Модели и типы фигур
-        lib/useShapeTransition.ts # Переходы между фигурами
+        model.ts                        # Модели и типы фигур
+        lib/useShapeTransition.ts       # Переходы между фигурами
 
 Shared:
     /src/shared/
-        constants/shapes.ts       # Константы фигур
-        types/index.ts           # Общие типы
-        utils/threeHelpers.ts    # Утилиты Three.js
+        constants/shapes.ts             # Константы фигур
+        types/index.ts                  # Общие типы
+        utils/threeHelpers.ts           # Утилиты Three.js
 
 Data:
     /src/data/
-        periodicTable.ts         # Данные элементов
+        periodicTable.ts                # Данные элементов
 
 API:
     /src/api/
-        main.py                  # Python API
+        main.py                         # Python API
 
 Build Safety Rules:
     1. Импорты:
